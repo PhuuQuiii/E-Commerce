@@ -1,0 +1,185 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\Http\Resources\FieldResource;
+use App\Models\Field;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+
+class FieldController extends Controller
+{
+
+    public function index()
+    {
+
+        $f = Field::all();
+
+        $arr = [
+            'status' => true,
+            'message' => 'Danh sách field',
+            'data' => FieldResource::collection($f)
+        ];
+
+        return response()->json($arr, 200);
+    }
+
+    public function admin()
+    {
+
+        $f = Field::paginate(7);
+
+        $arr = [
+            'status' => true,
+            'message' => 'Danh sách field',
+            'data' => $f
+        ];
+
+        return response()->json($arr, 200);
+    }
+
+    public function show(string $id)
+    {
+        $field = Field::find($id);
+
+        if (empty($field)) {
+            $arr = [
+                'status' => false,
+                'message' => 'Không có lĩnh vực này',
+                'data' => null
+            ];
+            return response()->json($arr, 404);
+        }
+
+        $arr = [
+            'status' => true,
+            'message' => "Thông tin lĩnh vực",
+            'data' => $field,
+        ];
+        return response()->json($arr, 200);
+    }
+
+    public function update(Request $request, string $id)
+    {
+        $field = Field::find($id);
+
+        if (empty($field)) {
+            $arr = [
+                'status' => false,
+                'message' => 'Không có lĩnh vực này',
+                'data' => null
+            ];
+            return response()->json($arr, 404);
+        }
+
+        $input = $request->all();
+
+        $validator = Validator::make($input, [
+            'field_name' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            $arr = [
+                'success' => false,
+                'message' => 'Lỗi kiểm tra dữ liệu',
+                'data' => $validator->errors()
+            ];
+            return response()->json($arr, 200);
+        }
+
+        $field->update($input);
+
+        $arr = [
+            'status' => true,
+            'message' => 'Thông tin lĩnh vực đã được cập nhật thành công',
+            'data' => new FieldResource($field)
+        ];
+
+        return response()->json($arr, 200);
+    }
+
+
+    public function delete(string $id)
+    {
+        try {
+            $field = Field::findOrFail($id);
+            $field->delete();
+
+            $arr = [
+                'status' => true,
+                'message' => 'Lĩnh vực đã được xóa thành công',
+                'data' => null
+            ];
+
+            return response()->json($arr, 200);
+        } catch (ModelNotFoundException $e) {
+            $arr = [
+                'success' => false,
+                'message' => 'Lĩnh vực dùng không tồn tại',
+                'data' => null
+            ];
+
+            return response()->json($arr, 404);
+        }
+    }
+
+    public function addField(Request $request)
+    {
+        try {
+            $input = $request->all();
+
+            $validator = Validator::make($input, [
+                'field_name' => 'required',
+                'icon_field' => 'required',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+            $field = Field::create([
+                'field_name' => $input['field_name'],
+                'icon_field' => $input['icon_field'],
+            ]);
+
+            return response()->json([
+                'status' => 201,
+                'message' => 'Field Created Successfully',
+                'data' => $field,
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error creating field',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    public function searchField(Request $request)
+    {
+        // Validate the request
+        $request->validate([
+            'field_name' => 'required|string|max:255',
+        ]);
+
+        // Get the field name from the request
+        $fieldName = $request->input('field_name');
+
+        // Query the database for fields matching the field name
+        $fields = Field::where('field_name', 'like', '%' . $fieldName . '%')->paginate(6);
+
+        // Check if any fields were found
+        if ($fields->isEmpty()) {
+            return response()->json(['message' => 'No fields found for the given criteria'], 404);
+        }
+
+        // Return the fields with pagination
+        return response()->json($fields, 200);
+    }
+}
